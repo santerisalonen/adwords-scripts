@@ -58,8 +58,8 @@ excludeSelector : object  where key = field name and value = pattern to match
 
 var debug = true; 
 var scriptName = 'Campaign updater';
-var alertEmailRecipient = 'my.email@example.com';
-var summaryEmailRecipient = 'my.email@example.com'; 
+var alertEmailRecipient = '';
+var summaryEmailRecipient = ''; 
 
 var config = {
   source : '',
@@ -67,20 +67,20 @@ var config = {
   budget : 10, 
   adGroupFrom : "id", 
   defaultBid : 1,
-  bidFormula : "if( {conversions} > 2 ) { {conversionRate} * 10 }", 
-  pauseWhen : "{} > 0.9 || ( {b_rate} == 0 && {views} > 600 )", 
+  bidFormula : "if( {views} > 300 ) { {b_rate} * 50 }", 
+  pauseWhen : "{so_rate} > 0.9 || ( {b_rate} == 0 && {views} > 600 )", 
   maxBid : 5, 
   minBid : 0.1, 
-  keywords : '{keywords}', 
-  keywordSplitter : ",",
-  kwCombineWithList : [ "generic", "category" ], 
+  keywords : '{name}', 
+  keywordSplitter : /[&\/,]+/,
+  kwCombineWithList : [ "generic", "parent" ], 
   kwCombineBefore : false, 
   kwCombineAfter : true,
   ads : [
     { 
-      headlinePart1 : 'My ad headline for {productName}', 
-      headlinePart2 : 'if( "{type}" == "CORE" ) {  "alkaen YYYY €"; } else {  "Katso valikoima"; }',
-      description : 'if( {hotel_count} > 9 { "Valitse {hotel_count} hotellista" } else { "Lomamatkat Apollomatkoilta" }',
+      headlinePart1 : 'My ad headline for {name}', 
+      headlinePart2 : '...',
+      description : '...',
       finalUrl : '{link}',
       path1 : '{parent}',
       path2 : '{id}'
@@ -90,22 +90,23 @@ var config = {
 };
 
 var keywordLists = { 
-  parent : [ "{category}" ],
-  generic : [ "tarjous", "verkkokauppa", "vertailu", "hinta" ]
+  parent : [ "{parent}" ],
+  generic : [ "matkat", "lomat", "lomamatkat" ]
 };
 
 var campaigns = [
   { 
-    budget : 5,
-    name : "Arabiemiraatit", 
-    includeSelector : { category_path : /arabiemiraatit/gi },
-    excludeSelector : { category_path : /dubai/gi },
+    budget : 20,
+    name : "Norja", 
+    includeSelector : { id: "Norja", category_path : /norja/gi },
+    excludeSelector : { 
+      id : /^Oslo$/, 
+      category_path : /oslo/gi },
   },
   { 
     name : "Dubai", 
     includeSelector : { 
       id : /^Dubai$/, 
-      category_path : /dubai/gi 
     }
   },
 ];
@@ -113,12 +114,18 @@ var campaigns = [
 existingCampaigns = {};
 newCampaigns = {};
 
-function readNewCampaignsStructure(callback) {
+function readNewCampaignStructure(callback) {
   
-  var json = fetchFeed(config.source);
-  if(!json) {
-    // stop execution
-    callback("unable to read feed");
+  try {
+    var json = fetchFeed(config.source);
+  }
+  catch(err) {
+    
+    MyLogger.log('ALERT', "Unable to read feed (errorMsg: " + err.message + ")"); 
+    if(!debug) {
+      MyLogger.send();
+    }
+    return;
   }
 
   // loop trough campaigns
@@ -404,7 +411,7 @@ function processCampaigns() {
         MyLogger.log('INFO', 'Pause campaign ' + campaignName );
       } 
       if( existingCampaigns[campaignName].budget != newCampaigns[campaignName].budget ) {
-        createOrUpdateCampaigns(campaignName, newCampaigns[campaignName].budget, status );
+        createOrUpdateCampaigns(campaignName, newCampaigns[campaignName].budget, newCampaigns[campaignName].status );
         MyLogger.log('INFO', 'Update campaign ' + campaignName + ' budget from ' + existingCampaigns[campaignName].budget + ' to ' + newCampaigns[campaignName].budget); 
       }  
     }
@@ -422,7 +429,7 @@ function processCampaigns() {
 
       if( !existingAdGroup ) { 
         newAdGroupOps.push(
-          existingCampaign.obj.newAdGroupBuilder()
+          existingCampaigns[campaignName].obj.newAdGroupBuilder()
           .withName( adGroupName )
           .withStatus( "ENABLED" )
           .withCpc( newAdGroup.bid )
@@ -445,7 +452,8 @@ function processCampaigns() {
         obj : adGroup,
         name : adGroup.getName(),
         bid : adGroup.bidding().getCpc(),
-        keywords : [] 
+        keywords : [],
+        ads : []
       };
     } else {
       // Handle the errors.
@@ -466,7 +474,7 @@ function processCampaigns() {
         
         var ad = newAdGroup.ads[i];
         
-        if( JSON.stringify( existingCampaigns[campaignName].adGroups[adGroupName].ads ).indexOf( JSON.stringify(ad) ) == -1 ) {
+        if( JSON.stringify( existingAdGroup.ads ).indexOf( JSON.stringify(ad) ) == -1 ) {
 
           newAdOps.push(
             existingAdGroup.obj.newAd().expandedTextAdBuilder()
@@ -540,22 +548,12 @@ function processCampaigns() {
  
 }
 function fetchFeed(url) {
-  try {
-    
-    var json = UrlFetchApp.fetch(url);
-    json = JSON.parse(json);
-    Logger.log( json.length + ' items returned from API');
-    return json;
-    
-  }
-  catch(err) {
-    callback(err);
-    Logger.log(err);
-    MailApp.sendEmail(alertEmail,
-                      'AW Script: ' + scriptName + ' unable to fetch feed',
-                      err.message );
-    return false;
-  }
+
+  var json = UrlFetchApp.fetch(url);
+  json = JSON.parse(json);
+  Logger.log( json.length + ' items returned from API');
+  return json;
+  
 }
 /*
 * AdWords Scripts does not support campaign creation directly, using bulk upload functionality
@@ -601,6 +599,7 @@ function nano(template, data) {
   });
 }
 var stats = {
+  ALERT : [],
   ERR : [],
   WARN : [],
   INFO : [],
@@ -626,7 +625,7 @@ var MyLogger = {
       msg += '<ul>';
       for(line in stats[key]) {
         var color = "#333";
-        if(key == 'ERR') {
+        if(key == 'ERR' || key == 'ALERT') {
           color = "red";
         }
         msg += '<li><span style="color:'+color+'">[' + key + ']</span> ' + stats[key][line] + "</li>";  
@@ -634,7 +633,9 @@ var MyLogger = {
       msg += '</ul>';
     }
     
-    if( stats.ERR.length > 0 ||
+    if( 
+       stats.ALERT.length > 0 ||
+       stats.ERR.length > 0 ||
        stats.NEW_ADGROUP.length > 0 ||
        stats.PAUSE_ADGROUP.length > 0 ) 
     {
@@ -648,17 +649,15 @@ var MyLogger = {
   }
 };
 function main() {
-  readExistingCampaignStructure(function(err) {
-    if(!err) {
-      readNewCampaignsStructure(function(err) {
-        processCampaigns();
+  readExistingCampaignStructure(function() {
 
-        if(!debug) {
-          MyLogger.send();
-        }
-      });
+    readNewCampaignStructure(function() {
+      processCampaigns();
+      
+      if(!debug) {
+        MyLogger.send();
+      }
     });
-  }
+ 
+  });
 }
-
-
