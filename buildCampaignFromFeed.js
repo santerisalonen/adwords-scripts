@@ -18,7 +18,7 @@ config options
 ----------------
 source : string required (item feed URL)
 campaignPrefix : string required (needs to be unique for campaigns handled by this script)
-adGroupFrom : string required (feed field key, needs to be unique for each adGroup)
+adGroupName : string required (feed field key, needs to be unique for each adGroup)
 campaignBudget : integer required 
 defaultBid : float required
 maxBid : integer required
@@ -64,7 +64,7 @@ var config = {
   source : '',
   campaignPrefix : 'MYTEST_',
   budget : 10, 
-  adGroupFrom : "id", 
+  adGroupName : "{id}", 
   defaultBid : 1,
   bidFormula : "if( {views} > 300 ) { {b_rate} * 50 }", 
   pauseWhen : "{so_rate} > 0.9 || ( {b_rate} == 0 && {views} > 600 )", 
@@ -158,11 +158,13 @@ function readNewCampaignStructure(callback) {
          if( !matchSelector(item, campaign.excludeSelector ) ) {
          
            // build name for AdGroup 
-           var adGroupName = (typeof campaign.adGroupFrom !== 'undefined' ) ? item[ campaign.adGroupFrom ] : item[ config.adGroupFrom ];
+           var adGroupName = (typeof campaign.adGroupName !== 'undefined' ) ? nano( campaign.adGroupName, item) : nano( config.adGroupName, item);
+
            if(!adGroupName) {
-             MyLogger.log('ERR', 'No adgroup name found for item (configuration for "adGroupFrom" is invalid');
+             MyLogger.log('ERR', 'No adgroup name found for item (configuration for "adGroupName" is invalid');
              continue;
            }
+           
            
            // start-stop rules
            var pauseWhen = (typeof campaign.pauseWhen !== 'undefined') ? campaign.pauseWhen : config.pauseWhen;
@@ -384,10 +386,12 @@ function processCampaigns() {
         counter = counter + 1;
         if(counter > 50) {
           skip = true;
+          break;
         }
       }
       if(skip) {
         MyLogger.log('ERR', 'Unable to create campaign ' + campaignName + '. It took too long to create. (Or in preview mode)');
+        delete NewCampaigns[campaignName];
         continue;
       }
       var createdCampaign = AdWordsApp.campaigns().withCondition('Name = "' + campaignName + '"').get().next();
