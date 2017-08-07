@@ -58,8 +58,7 @@ excludeSelector : object  where key = field name and value = pattern to match
 
 var debug = true; 
 var scriptName = 'Campaign updater';
-var alertEmailRecipient = '';
-var summaryEmailRecipient = ''; 
+var emailRecipient = ''; 
 
 var config = {
   source : '',
@@ -114,6 +113,7 @@ var campaigns = [
 existingCampaigns = {};
 newCampaigns = {};
 
+
 function readNewCampaignStructure(callback) {
   
   try {
@@ -123,7 +123,7 @@ function readNewCampaignStructure(callback) {
     
     MyLogger.log('ALERT', "Unable to read feed (errorMsg: " + err.message + ")"); 
     if(!debug) {
-      MyLogger.send();
+      MyLogger.send("alert");
     }
     return;
   }
@@ -409,6 +409,7 @@ function processCampaigns() {
       else if( existingCampaigns[campaignName].obj.isEnabled() && newCampaigns[campaignName].status == 'PAUSED' ) {
         existingCampaigns[campaignName].obj.pause();
         MyLogger.log('INFO', 'Pause campaign ' + campaignName );
+        
       } 
       if( existingCampaigns[campaignName].budget != newCampaigns[campaignName].budget ) {
         createOrUpdateCampaigns(campaignName, newCampaigns[campaignName].budget, newCampaigns[campaignName].status );
@@ -619,7 +620,8 @@ var MyLogger = {
     }
     stats[type].push(msg);
   },
-  send : function() {
+  send : function(topic) {
+    
     var msg = '';
     for( key in stats) {
       msg += '<ul>';
@@ -633,19 +635,14 @@ var MyLogger = {
       msg += '</ul>';
     }
     
-    if( 
-       stats.ALERT.length > 0 ||
-       stats.ERR.length > 0 ||
-       stats.NEW_ADGROUP.length > 0 ||
-       stats.PAUSE_ADGROUP.length > 0 ) 
-    {
+
       
-      MailApp.sendEmail( {
-        to : summaryEmailRecipient,
-        subject : 'AW Script: ' + scriptName + ' summary',
-        htmlBody : msg
-      } );
-    }
+     MailApp.sendEmail( {
+       to : emailRecipient,
+       subject : AdWordsApp.currentAccount().getName() + ': ' + scriptName + ' ' + topic,
+       htmlBody : msg
+     } );
+    
   }
 };
 function main() {
@@ -655,7 +652,14 @@ function main() {
       processCampaigns();
       
       if(!debug) {
-        MyLogger.send();
+        if( 
+          stats.ALERT.length > 0 ||
+          stats.ERR.length > 0 ||
+          stats.NEW_ADGROUP.length > 0 ||
+          stats.PAUSE_ADGROUP.length > 0 ) 
+        {
+          MyLogger.send("summary");
+        }
       }
     });
  
