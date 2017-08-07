@@ -113,7 +113,6 @@ var campaigns = [
 existingCampaigns = {};
 newCampaigns = {};
 
-
 function readNewCampaignStructure(callback) {
   
   try {
@@ -372,18 +371,22 @@ function processCampaigns() {
     }
   }
 
-  
 
   // create new campaigns
   for(var campaignName in newCampaigns) {    
+   
     if( typeof existingCampaigns[campaignName] === 'undefined' ) {
+      
+      
 
       createOrUpdateCampaigns(campaignName, newCampaigns[campaignName].budget, newCampaigns[campaignName].status);
       // we need to wait for the campaign to be created, does not work in preview mode
       var counter = 0;
       var skip = false;
       while(AdWordsApp.campaigns().withCondition('Name = "' + campaignName + '"').get().totalNumEntities() === 0) {
+    
         counter = counter + 1;
+  
         if(counter > 50) {
           skip = true;
           break;
@@ -391,7 +394,9 @@ function processCampaigns() {
       }
       if(skip) {
         MyLogger.log('ERR', 'Unable to create campaign ' + campaignName + '. It took too long to create. (Or in preview mode)');
-        delete NewCampaigns[campaignName];
+        
+        delete newCampaigns[campaignName];
+        
         continue;
       }
       var createdCampaign = AdWordsApp.campaigns().withCondition('Name = "' + campaignName + '"').get().next();
@@ -564,16 +569,16 @@ function fetchFeed(url) {
 * AdWords Scripts does not support campaign creation directly, using bulk upload functionality
 * See https://developers.google.com/adwords/scripts/docs/features/bulk-upload
 */
-function createOrUpdateCampaigns(obj, callback) {
+function createOrUpdateCampaigns(name, budget, status, callback) {
   
   var columns = ['Campaign', 'Budget', 'Bid Strategy type', 'Campaign type', 'Campaign status'];
   
   var upload = AdWordsApp.bulkUploads().newCsvUpload( columns, {moneyInMicros: false});
   
-  var status = obj.status || "ENABLED";
+  var status = status || "ENABLED";
   upload.append({
-    'Campaign': obj.name,
-    'Budget': obj.budget,
+    'Campaign': name,
+    'Budget': budget,
     'Bid Strategy type': 'cpc',
     'Campaign type': 'Search Only',
     'Campaign status': status
