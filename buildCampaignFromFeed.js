@@ -624,9 +624,7 @@ var stats = {
 };  
 var MyLogger = {
   log : function(type, msg) {  
-    if(debug == true) {
-      Logger.log('[' + type +'] ' + msg);
-    }
+    Logger.log('[' + type +'] ' + msg);
     stats[type].push(msg);
   },
   send : function(topic) {
@@ -643,10 +641,7 @@ var MyLogger = {
       }
       msg += '</ul>';
     }
-    
-
-      
-     MailApp.sendEmail( {
+    MailApp.sendEmail( {
        to : emailRecipient,
        subject : AdWordsApp.currentAccount().getName() + ': ' + scriptName + ' ' + topic,
        htmlBody : msg
