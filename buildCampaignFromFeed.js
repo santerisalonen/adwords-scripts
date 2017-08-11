@@ -69,6 +69,8 @@ var campaigns = [
     includeSelector : { id: "Malediivit" },
   },
 ];
+
+
 existingCampaigns = {};
 newCampaigns = {};
 
@@ -422,7 +424,7 @@ function processCampaigns() {
       };
     } else {
       // Handle the errors.
-      MyLogger.log('ERR', newAdGroups[i] + ' error: ' + newAdGroupOps[i].getErrors() );
+      MyLogger.log('ERR', JSON.stringify( newAdGroups[i] ) + ' error: ' + newAdGroupOps[i].getErrors() );
 
     }
   }
@@ -472,7 +474,7 @@ function processCampaigns() {
 
     } else {
       // Handle the errors.
-      MyLogger.log('ERR', newAds[i] + ' error:' + newAdOps[i].getErrors());
+      MyLogger.log('ERR', JSON.stringify( newAds[i] ) + ' error:' + newAdOps[i].getErrors());
       
 
 
@@ -514,7 +516,7 @@ function processCampaigns() {
 
     } else {
       // Handle the errors.
-      MyLogger.log('ERR', newKeywords[i] + ' error: ' + newKeywordOps[i].getErrors())
+      MyLogger.log('ERR', JSON.stringify( newKeywords[i] ) + ' error: ' + newKeywordOps[i].getErrors())
 
     }
   } 
