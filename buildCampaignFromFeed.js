@@ -204,6 +204,8 @@ function readNewCampaignStructure(callback) {
              
            // build keywords
            var kwTemplate = (typeof campaign.keywords !== 'undefined') ? campaign.keywords : config.keywords;
+      
+           
            newCampaigns[ campaign.name ].adGroups[ adGroupName ].keywords = keywordGenerator( kwTemplate, item);
            
            
@@ -216,7 +218,9 @@ function readNewCampaignStructure(callback) {
 
 function readExistingCampaignStructure(callback) {
   
- var campaignIterator = AdWordsApp.campaigns().withCondition('Name STARTS_WITH "' + config.campaignPrefix + '"').get();
+ var campaignIterator = AdWordsApp.campaigns()
+ .withCondition('Name STARTS_WITH "' + config.campaignPrefix + '"')
+ .withCondition('Status != "REMOVED"').get();
   while (campaignIterator.hasNext()) {
     var campaign = campaignIterator.next();
     existingCampaigns[ campaign.getName() ] = { 
@@ -226,8 +230,7 @@ function readExistingCampaignStructure(callback) {
       adGroups : {} 
     };
     
-    var adGroupIterator = AdWordsApp.adGroups()
-    .withCondition("CampaignName = \"" + campaign.getName() + "\"").get();
+    var adGroupIterator = campaign.adGroups().get();
     
     while (adGroupIterator.hasNext()) {
       var adGroup = adGroupIterator.next();
@@ -309,9 +312,9 @@ function processCampaigns() {
       // loop through keywords 
       for(var n in existingCampaigns[campaignName].adGroups[adGroupName].keywords) {
         var keyword = existingCampaigns[campaignName].adGroups[adGroupName].keywords[n];
-        
+
         if( newCampaigns[campaignName].adGroups[adGroupName].keywords.indexOf( keyword ) === -1 ) {
-          existingCampaigns[campaignName].adGroups[adGroupName].obj.keywords().withCondition("Text = \"" + keyword + "\"").get().next().remove(); 
+          existingCampaigns[campaignName].adGroups[adGroupName].obj.keywords().withCondition("Text = \"" + keyword.replace(/[\[\]\+\"]/g, '') + "\"").get().next().remove(); 
           MyLogger.log('REMOVE_KEYWORD', keyword);
         } 
       }
@@ -493,6 +496,8 @@ function processCampaigns() {
         
         var keyword = newAdGroup.keywords[i];
         
+        
+        
         if( existingAdGroup.keywords.indexOf(keyword) === -1 ) {
           newKeywordOps.push(
             existingAdGroup.obj.newKeywordBuilder()
@@ -657,10 +662,12 @@ function validateExpandedTextAd(ad) {
 }
 function keywordGenerator(templates, item) {
   var validateKeyword = function(keyword) {
-    return keyword.replace(/[^A-Za-zäö ]/g, '').replace(/\s+/g, ' ').trim();
+    keyword = keyword.trim().replace(/[^A-Za-zäö ]/g, '').replace(/\s+/g, ' ');
+    return keyword;
     
   }
   var keywordFormat = function(matchType, keyword) {
+
     var matchTypesAllowed = [ 'broad', 'broadMatchModifier', 'exact', 'phrase' ]
     if(!matchType ) {
       matchType = 'broad';
@@ -672,16 +679,17 @@ function keywordGenerator(templates, item) {
     keyword = validateKeyword(keyword);
     switch(matchType ) {
       case 'exact':
-        kw = '[' + keyword +']';
+        keyword = '[' + keyword +']';
         break;
       case 'broadMatchModifier':
-        kw = '+' + keyword.split(' ').join(' +');
+        keyword = '+' + keyword.split(' ').join(' +');
         break;
       case 'phrase':
-        kw = '"' + keyword + '"';
+        keyword = '"' + keyword + '"';
         break;
     }
-    return kw;
+    
+    return keyword;
     
   }
   var created = [];
