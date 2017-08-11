@@ -129,17 +129,31 @@ function readNewCampaignStructure(callback) {
            var pauseWhen = (typeof campaign.pauseWhen !== 'undefined') ? campaign.pauseWhen : config.pauseWhen;
            if( pauseWhen ) {
              pauseWhen = nano(pauseWhen, item);
-             if( eval(pauseWhen) ) {
-               MyLogger.log('INFO', 'Pause-rule triggered for adgroup ' + adGroupName + ' (campaign: ' + campaign.name + ')');
+             try { 
+               if( eval(pauseWhen) ) {
+                 MyLogger.log('INFO', 'Pause-rule triggered for adgroup ' + adGroupName + ' (campaign: ' + campaign.name + ')');
+                 continue;
                
+               }
              }
+             catch(err) {
+               MyLogger.log('ERR', 'Pause-rule error: ' + err.message + ' rule: ' + pauseWhen);
+             }
+               
+
              
            }
            
            // build bid
            var bidFormula = (typeof campaign.bidFormula !== 'undefined') ? campaign.bidFormula : config.bidFormula;
            bidFormula = nano(bidFormula, item);
-           var bid = eval(bidFormula);
+           try {
+             var bid = eval(bidFormula);
+           }
+           catch(err) {
+             var bid;
+             MyLogger.log('ERR', 'Bid formula error: ' + err.message + ' formula: ' + bidFormula);
+           }
            bid = (typeof bid === 'number') ? bid : (typeof campaign.defaultBid === 'number') ? campaign.defaultBid : config.defaultBid;
            
            var maxBid = campaign.maxBid || config.maxBid || 10;
