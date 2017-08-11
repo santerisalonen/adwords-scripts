@@ -4,88 +4,50 @@ Campaign updater 1.0.1
 
 Description:
 Syncs feed content with Adwords
-
-Configuration:
-
-general
----------------
-debug : boolean (true : send email summary, false : output in log)
-scriptName : string optional (used in emails)
-alertEmail : string optional (send technical alerts)
-summaryEmail : string optional (send email summary if adgroup changes)
-
-config options
-----------------
-source : string required (item feed URL)
-campaignPrefix : string required (needs to be unique for campaigns handled by this script)
-adGroupName : string required (feed field key, needs to be unique for each adGroup)
-campaignBudget : integer required 
-defaultBid : float required
-maxBid : integer required
-minBid : integer required
-keywords : string* optional (required for keyword creation)
-keywordSplitter : string/regex (use to split keyword input into multiple keywords, default = comma)
-bidFormula : string** optional 
-pauseWhen : string** optional
-kwCombineWithList : array optional
-kwCombineBefore : boolena, default false
-kwCombineAfter : boolean, default true
-ad : array [ ad (object), ad ] (required for ad creation)
-pause : boolean default false (pause campaigns)
- 
-* Possible to replace {value} inside brackets using value from feed, separate multiple keywords with comma
-** Use dynamic values {..} and use javascript statements e.g. "if( {addToCartRatio} > 0.4 ) {..."
-
-ad configuration
---------------------
-headlinePart1 : string**
-headlinePart2 : string**
-description : string**
-finalUrl : string**
-path1 : string**
-path2 : string**
- 
-Default configuration values can be overwritten in campaign-specific setup 
- 
-
-campaign-specific config
-------------------
-includeSelector : object where key = field name and value = pattern to match
-excludeSelector : object  where key = field name and value = pattern to match
- 
  
 **************/
-
-var debug = true; 
-var scriptName = 'Campaign updater';
+var debug = false; 
+var scriptName = '';
 var emailRecipient = ''; 
 
 var config = {
-  source : '',
+  source : '<url>',
   campaignPrefix : 'MYTEST_',
   budget : 10, 
   adGroupName : "{id}", 
   defaultBid : 1,
   bidFormula : "if( {views} > 300 ) { {b_rate} * 50 }", 
-  pauseWhen : "{so_rate} > 0.9 || ( {b_rate} == 0 && {views} > 600 )", 
+  // pauseWhen : "{so_rate} > 0.9 || ( {b_rate} == 0 && {views} > 600 )", 
   maxBid : 5, 
   minBid : 0.1, 
-  keywords : '{name}', 
+  keywords : [   
+    {
+      matchType : 'exact',
+      seed : '{name}',
+    },
+    {
+      matchType : 'broadMatchModifier',
+      seed : '{name}',
+      combineList : 'parent',
+    },
+    {
+      matchType : 'broadMatchModifier',
+      seed : '{name}',
+      combineList : 'generic',
+    } 
+  ],
   keywordSplitter : /[&\/,]+/,
-  kwCombineWithList : [ "generic", "parent" ], 
-  kwCombineBefore : false, 
-  kwCombineAfter : true,
+  pause: true,
   ads : [
     { 
-      headlinePart1 : 'My ad headline for {name}', 
-      headlinePart2 : '...',
-      description : '...',
+      headlinePart1 : '{name}', 
+      headlinePart2 : 'text here',
+      description : 'description',
       finalUrl : '{link}',
       path1 : '{parent}',
       path2 : '{id}'
     }
-  ],
-  pause : true
+  ]
 };
 
 var keywordLists = { 
@@ -95,18 +57,16 @@ var keywordLists = {
 
 var campaigns = [
   { 
+    pause: true,
     budget : 20,
-    name : "Norja", 
-    includeSelector : { id: "Norja", category_path : /norja/gi },
-    excludeSelector : { 
-      id : /^Oslo$/, 
-      category_path : /oslo/gi },
+    name : "Bulgaria", 
+    includeSelector : { id: "Bulgaria", category_path : /bulgaria/gi },
   },
   { 
-    name : "Dubai", 
-    includeSelector : { 
-      id : /^Dubai$/, 
-    }
+    pause: true,
+    budget : 20,
+    name : "Malediivit", 
+    includeSelector : { id: "Malediivit" },
   },
 ];
 
@@ -158,7 +118,7 @@ function readNewCampaignStructure(callback) {
          
            // build name for AdGroup 
            var adGroupName = (typeof campaign.adGroupName !== 'undefined' ) ? nano( campaign.adGroupName, item) : nano( config.adGroupName, item);
-
+           
            if(!adGroupName) {
              MyLogger.log('ERR', 'No adgroup name found for item (configuration for "adGroupName" is invalid');
              continue;
@@ -171,7 +131,7 @@ function readNewCampaignStructure(callback) {
              pauseWhen = nano(pauseWhen, item);
              if( eval(pauseWhen) ) {
                MyLogger.log('INFO', 'Pause-rule triggered for adgroup ' + adGroupName + ' (campaign: ' + campaign.name + ')');
-               continue;
+               
              }
              
            }
@@ -226,39 +186,9 @@ function readNewCampaignStructure(callback) {
            newCampaigns[ campaign.name ].adGroups[ adGroupName ].ads = ads;
              
            // build keywords
-           var keywords_t = (typeof campaign.keywords !== 'undefined') ? campaign.keywords : config.keywords;
-           var keywordSplitter = (typeof campaign.keywordSplitter !== 'undefined') ? campaign.keywordSplitter : config.keywordSplitter || ",";
+           var kwTemplate = (typeof campaign.keywords !== 'undefined') ? campaign.keywords : config.keywords;
+           newCampaigns[ campaign.name ].adGroups[ adGroupName ].keywords = keywordGenerator( kwTemplate, item);
            
-           keywords_t = nano(keywords_t, item).split(keywordSplitter);
-           
-           var keywords = [];        
-           
-           for(var kw in keywords_t) {
-             keywords.push( keywords_t[kw].trim() ); 
-           }
-           
-           var lists = (typeof campaign.kwCombineWithList !== 'undefined') ? campaign.kwCombineWithList : config.kwCombineWithList;
-           var combineBefore = (typeof campaign.kwCombineBefore !== 'undefined') ? campaign.kwCombineBefore : config.kwCombineBefore;
-           var combineAfter = (typeof campaign.kwCombineAfter !== 'undefined') ? campaign.kwCombineAfter : (typeof config.kwCombineAfter !== 'undefined') ? config.kwCombineAfter : true;  
-           for(var n in keywords_t) {
-             keywords.push(  keywords_t[n].trim() );
-             if(lists) {
-               for(var list in lists) {
-                 var list = lists[list];
-                 for(var z in keywordLists[list]) {
-                   if(combineAfter) {
-                     keywords.push( keywords_t[n].trim() + ' ' + nano( keywordLists[list][z], item ) );   
-                   }
-                   if(combineBefore) {
-                     keywords.push( keywordLists[list][z] + ' ' + nano( keywords_t[n].trim(), item ) );  
-                   }
-                 }
-                 
-               }
-             }
-           }
-
-           newCampaigns[ campaign.name ].adGroups[ adGroupName ].keywords = keywords;
            
          }
       }
@@ -436,8 +366,9 @@ function processCampaigns() {
       var newAdGroup = newCampaigns[campaignName].adGroups[adGroupName];
       var existingAdGroup = (typeof existingCampaigns[campaignName].adGroups[adGroupName] === 'undefined') ? null : existingCampaigns[campaignName].adGroups[adGroupName];
       
-
       if( !existingAdGroup ) { 
+        
+        Logger.log( 'create new adgroup ' + adGroupName );
         newAdGroupOps.push(
           existingCampaigns[campaignName].obj.newAdGroupBuilder()
           .withName( adGroupName )
@@ -623,7 +554,7 @@ var stats = {
   REMOVE_CAMPAIGN : []
 };  
 var MyLogger = {
-  log : function(type, msg) {  
+  log : function(type, msg) {   
     Logger.log('[' + type +'] ' + msg);
     stats[type].push(msg);
   },
@@ -641,7 +572,9 @@ var MyLogger = {
       }
       msg += '</ul>';
     }
-    MailApp.sendEmail( {
+    
+ 
+     MailApp.sendEmail( {
        to : emailRecipient,
        subject : AdWordsApp.currentAccount().getName() + ': ' + scriptName + ' ' + topic,
        htmlBody : msg
@@ -649,6 +582,98 @@ var MyLogger = {
     
   }
 };
+function keywordGenerator(templates, item) {
+  var keywordFormat = function(matchType, keyword) {
+    var matchTypesAllowed = [ 'broad', 'broadMatchModifier', 'exact', 'phrase' ]
+    if(!matchType ) {
+      matchType = 'broad';
+    }
+    if( matchTypesAllowed.indexOf( matchType ) == -1 ) {
+      console.log('Invalid matchType "' + matchType + '", using broad');
+      matchType = 'broad';
+    }
+    keyword = keyword.replace(/\s+/g, ' ').trim();
+    switch(matchType ) {
+      case 'exact':
+        kw = '[' + keyword +']';
+        break;
+      case 'broadMatchModifier':
+        kw = '+' + keyword.split(' ').join(' +');
+        break;
+      case 'phrase':
+        kw = '"' + keyword + '"';
+        break;
+    }
+    return kw;
+    
+  }
+  var created = [];
+  for( var t in templates) {
+    
+    var template = templates[t];
+  
+    var keywordSplitter = (typeof template.keywordSplitter !== 'undefined') ? template.keywordSplitter : ( typeof config.keywordSplitter !== 'undefined' ) ? config.keywordSplitter : ',';
+    var seeds = nano(template.seed, item);
+    seeds = seeds.split(keywordSplitter);
+    
+    if( template.exclude ) {
+      var excludePattern = new RegExp(template.exclude);   
+    }
+    var combineAfter = (typeof template.combineAfter !== 'undefined') ? template.combineAfter : true;
+    var combineBefore = (typeof template.combineBefore !== 'undefined') ? template.combineBefore : false;
+     
+    for(var i in seeds ) {
+      if( !template.combineList ) {
+        var kw = keywordFormat(template.matchType, seeds[i] );
+        if( template.exclude ) {
+          if ( !excludePattern.test(kw) ) {
+            created.push( kw );
+          }
+        }
+        else {
+          created.push( kw );
+        }
+      }
+      else {  
+        for( var j in keywordLists[template.combineList] ) {
+          var mergeKws = nano( keywordLists[template.combineList][j], item).split(keywordSplitter);
+          for( var k in mergeKws) {
+            if( combineAfter ) {
+              var kw = keywordFormat(template.matchType, seeds[i] + ' ' + mergeKws[k] );
+              if( template.exclude ) {
+                if( !excludePattern.test(kw) ) {
+                  created.push( kw );
+                }
+              }
+              else {
+                created.push( kw );
+              }
+            }
+            if( combineBefore ) {
+              var kw = keywordFormat(template.matchType, mergeKws[k] + ' ' +  seeds[i] );
+              if( template.exclude ) {
+                if( !excludePattern.test(kw) ) {
+                  created.push( kw );
+                }
+              }
+              else {
+                created.push( kw );
+              }
+
+            }
+
+          }
+          
+        }
+      }
+      
+    }
+  }
+  
+  return created;
+  
+  
+}
 function main() {
   readExistingCampaignStructure(function() {
 
