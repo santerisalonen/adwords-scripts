@@ -594,16 +594,13 @@ var MyLogger = {
   },
   send : function(topic) {
     
-    var msg = '';
+    var msg = '<ul>';
     for( key in stats) {
-      msg += '<ul>';
-      
       var color = "#333";
       if(key == 'ERR' || key == 'ALERT') {
         color = "red";
       }
       msg += '<li><span style="color:'+color+'">[' + key + ']</span> COUNT: ' + stats[key].length + "</li>";  
-      
       
     }
     msg += '</ul>';
