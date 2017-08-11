@@ -187,16 +187,19 @@ function readNewCampaignStructure(callback) {
                  path1 :  nano(ads_t[n].path1, item),
                  path2 :  nano(ads_t[n].path2, item),
                }
+               // execute possible javascript
                for(line in ads[n]) {
                  try {
                    ads[n][line] = eval( ads[n][line] );
                  }
                  catch(e){}
-               
                }
+               // ensure we are in character limits
+               ads[n] = validateExpandedTextAd(ads[n]);
              }         
            }
           
+           // Logger.log( ads );
            newCampaigns[ campaign.name ].adGroups[ adGroupName ].ads = ads;
              
            // build keywords
@@ -373,6 +376,7 @@ function processCampaigns() {
   
   // create new adgroups
   var newAdGroupOps = [];
+  var newAdGroups = [];
   for(var campaignName in newCampaigns) {
     
     for( var adGroupName in newCampaigns[campaignName].adGroups ) {
@@ -380,14 +384,16 @@ function processCampaigns() {
       var newAdGroup = newCampaigns[campaignName].adGroups[adGroupName];
       var existingAdGroup = (typeof existingCampaigns[campaignName].adGroups[adGroupName] === 'undefined') ? null : existingCampaigns[campaignName].adGroups[adGroupName];
       
-      if( existingAdGroup.obj.isPaused() ) {
-        existingAdGroup.obj.enable();
-        MyLogger.log('INFO', 'Enable adgroup ' + adGroupName + ' (campaign: ' + campaignName +')' );
+      if( existingAdGroup ) {
+        if( existingAdGroup.obj.isPaused() ) {
+          existingAdGroup.obj.enable();
+          MyLogger.log('INFO', 'Enable adgroup ' + adGroupName + ' (campaign: ' + campaignName +')' );
+        }
       }
       
       if( !existingAdGroup ) { 
         
-        Logger.log( 'create new adgroup ' + adGroupName );
+        // Logger.log( 'create new adgroup ' + adGroupName );
         newAdGroupOps.push(
           existingCampaigns[campaignName].obj.newAdGroupBuilder()
           .withName( adGroupName )
@@ -417,13 +423,14 @@ function processCampaigns() {
       };
     } else {
       // Handle the errors.
-      MyLogger.log('ERR', newAdGroupOps[i].getErrors() );
+      MyLogger.log('ERR', newAdGroups + ' error: ' + newAdGroupOps[i].getErrors() );
 
     }
   }
 
   // create new ads
   var newAdOps = [];
+  var newAds = [];
   for(var campaignName in newCampaigns) {
     for( var adGroupName in newCampaigns[campaignName].adGroups ) {  
 
@@ -446,7 +453,11 @@ function processCampaigns() {
             .withFinalUrl(ad.finalUrl)
             .build()
           );
+          
+          newAds.push(ad);
+          
         } 
+        
 
       }
       
@@ -462,13 +473,16 @@ function processCampaigns() {
 
     } else {
       // Handle the errors.
-      MyLogger.log('ERR', newAdOps[i].getErrors());
+      MyLogger.log('ERR', newAds[i].headlinePart1 + ' error:' + newAdOps[i].getErrors());
+      
+
 
     }
   } 
   
   // create new keywords
   var newKeywordOps = [];
+  var newKeywords = [];
   for(var campaignName in newCampaigns) {
     for( var adGroupName in newCampaigns[campaignName].adGroups ) {
       
@@ -485,6 +499,7 @@ function processCampaigns() {
             .withText(keyword)
             .build()
           );
+          newKeywords.push(keyword);
         } 
 
       }
@@ -500,7 +515,7 @@ function processCampaigns() {
 
     } else {
       // Handle the errors.
-      MyLogger.log('ERR', newKeywordOps[i].getErrors());
+      MyLogger.log('ERR', newKeywords[i] + ' error: ' + newKeywordOps[i].getErrors())
 
     }
   } 
@@ -601,6 +616,41 @@ var MyLogger = {
     
   }
 };
+function validateExpandedTextAd(ad) {
+  var removeUntil = function(count, string) {
+    while( string.length > count ) {
+   
+      // remove last word
+      var lastSpace = string.lastIndexOf(" ");
+      if( lastSpace == -1 ) {
+        return string.substring(0, count);
+        break;
+      }
+      
+      string = string.substring(0, lastSpace);
+    }
+    return string;
+    
+  }
+  // execute possible javascript
+  for(line in ad) {
+    switch(line) {
+      case 'headlinePart1':
+      case 'headlinePart2':
+        ad[line] = removeUntil(29, ad[line]);
+        break;
+      case 'path1':
+      case 'path2':
+        ad[line] = removeUntil(14, ad[line]);
+        break;
+      case 'description':
+        ad[line] = removeUntil(79, ad[line]);
+        break;
+    }
+  }
+  return ad;
+     
+}
 function keywordGenerator(templates, item) {
   var keywordFormat = function(matchType, keyword) {
     var matchTypesAllowed = [ 'broad', 'broadMatchModifier', 'exact', 'phrase' ]
@@ -608,7 +658,7 @@ function keywordGenerator(templates, item) {
       matchType = 'broad';
     }
     if( matchTypesAllowed.indexOf( matchType ) == -1 ) {
-      console.log('Invalid matchType "' + matchType + '", using broad');
+      MyLogger.log('WARN', 'Invalid matchType "' + matchType + '", using broad');
       matchType = 'broad';
     }
     keyword = keyword.replace(/\s+/g, ' ').trim();
@@ -655,12 +705,19 @@ function keywordGenerator(templates, item) {
       }
       else {  
         for( var j in keywordLists[template.combineList] ) {
+          if( !keywordLists[template.combineList][j] ) {
+            break; 
+          }
           var mergeKws = nano( keywordLists[template.combineList][j], item).split(keywordSplitter);
+          if( !mergeKws || mergeKws.length == 0) {
+            break;
+          }
           for( var k in mergeKws) {
             if( combineAfter ) {
               var kw = keywordFormat(template.matchType, seeds[i] + ' ' + mergeKws[k] );
               if( template.exclude ) {
                 if( !excludePattern.test(kw) ) {
+                  
                   created.push( kw );
                 }
               }
