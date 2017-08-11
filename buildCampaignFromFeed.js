@@ -366,6 +366,11 @@ function processCampaigns() {
       var newAdGroup = newCampaigns[campaignName].adGroups[adGroupName];
       var existingAdGroup = (typeof existingCampaigns[campaignName].adGroups[adGroupName] === 'undefined') ? null : existingCampaigns[campaignName].adGroups[adGroupName];
       
+      if( existingAdGroup.obj.isPaused() ) {
+        existingAdGroup.obj.enable();
+        MyLogger.log('INFO', 'Enable adgroup ' + adGroupName + ' (campaign: ' + campaignName +')' );
+      }
+      
       if( !existingAdGroup ) { 
         
         Logger.log( 'create new adgroup ' + adGroupName );
