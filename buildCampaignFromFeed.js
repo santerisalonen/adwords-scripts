@@ -70,7 +70,6 @@ var campaigns = [
   },
 ];
 
-
 existingCampaigns = {};
 newCampaigns = {};
 
@@ -598,16 +597,16 @@ var MyLogger = {
     var msg = '';
     for( key in stats) {
       msg += '<ul>';
-      for(line in stats[key]) {
-        var color = "#333";
-        if(key == 'ERR' || key == 'ALERT') {
-          color = "red";
-        }
-        msg += '<li><span style="color:'+color+'">[' + key + ']</span> ' + stats[key][line] + "</li>";  
+      
+      var color = "#333";
+      if(key == 'ERR' || key == 'ALERT') {
+        color = "red";
       }
-      msg += '</ul>';
+      msg += '<li><span style="color:'+color+'">[' + key + ']</span> COUNT: ' + stats[key].length + "</li>";  
+      
+      
     }
-    
+    msg += '</ul>';
  
      MailApp.sendEmail( {
        to : emailRecipient,
@@ -635,7 +634,8 @@ function validateExpandedTextAd(ad) {
     
   }
   var validatePath = function(path) {
-    return path.replace(/[^A-Za-zäö ]/gi, '');
+    path = path.replace(/[^A-Za-zäö ]/gi, '');
+    return path.replace(/\s/g, '-'); 
     
   }
   // execute possible javascript
