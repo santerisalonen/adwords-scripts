@@ -616,6 +616,7 @@ var MyLogger = {
     
   }
 };
+
 function validateExpandedTextAd(ad) {
   var removeUntil = function(count, string) {
     while( string.length > count ) {
@@ -632,6 +633,10 @@ function validateExpandedTextAd(ad) {
     return string;
     
   }
+  var validatePath = function(path) {
+    return path.replace(/[^A-Za-zäö ]/gi, '');
+    
+  }
   // execute possible javascript
   for(line in ad) {
     switch(line) {
@@ -642,6 +647,7 @@ function validateExpandedTextAd(ad) {
       case 'path1':
       case 'path2':
         ad[line] = removeUntil(14, ad[line]);
+        ad[line] = validatePath(ad[line]);
         break;
       case 'description':
         ad[line] = removeUntil(79, ad[line]);
@@ -652,6 +658,10 @@ function validateExpandedTextAd(ad) {
      
 }
 function keywordGenerator(templates, item) {
+  var validateKeyword = function(keyword) {
+    return keyword.replace(/[^A-Za-zäö ]/g, '').replace(/\s+/g, ' ').trim();
+    
+  }
   var keywordFormat = function(matchType, keyword) {
     var matchTypesAllowed = [ 'broad', 'broadMatchModifier', 'exact', 'phrase' ]
     if(!matchType ) {
@@ -661,7 +671,7 @@ function keywordGenerator(templates, item) {
       MyLogger.log('WARN', 'Invalid matchType "' + matchType + '", using broad');
       matchType = 'broad';
     }
-    keyword = keyword.replace(/\s+/g, ' ').trim();
+    keyword = validateKeyword(keyword);
     switch(matchType ) {
       case 'exact':
         kw = '[' + keyword +']';
