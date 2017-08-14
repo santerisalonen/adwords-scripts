@@ -18,6 +18,7 @@ var config = {
   defaultBid : 1,
   bidFormula : "if( {views} > 300 ) { {b_rate} * 50 }", 
   // pauseWhen : "{so_rate} > 0.9 || ( {b_rate} == 0 && {views} > 600 )", 
+  locations : [ 2246 ],
   maxBid : 5, 
   minBid : 0.1, 
   keywords : [   
