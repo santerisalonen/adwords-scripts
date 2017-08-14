@@ -100,12 +100,17 @@ function readNewCampaignStructure(callback) {
     
     // set budget 
     var budget = (typeof campaign.budget !== "undefined") ? parseInt(campaign.budget) : parseInt( config.budget);
+
+    // set locations
+    var locations = (typeof campaign.locations !== "undefined") ? campaign.locations : (config.locations) ? config.locations : [];
+    
     
     // campaign
     newCampaigns[ campaign.name ] = {
       name : campaign.name,
       budget : budget,
       status : status,
+      locations : locations,
       adGroups : {}
     };
     
@@ -205,7 +210,7 @@ function readNewCampaignStructure(callback) {
            // build keywords
            var kwTemplate = (typeof campaign.keywords !== 'undefined') ? campaign.keywords : config.keywords;
       
-           
+           // Logger.log(keywordGenerator( kwTemplate, item));
            newCampaigns[ campaign.name ].adGroups[ adGroupName ].keywords = keywordGenerator( kwTemplate, item);
            
            
@@ -213,6 +218,7 @@ function readNewCampaignStructure(callback) {
       }
     }
   }
+  
   callback();
 }
 
@@ -227,8 +233,16 @@ function readExistingCampaignStructure(callback) {
       obj : campaign, 
       name : campaign.getName(),
       budget : campaign.getBudget(),
+      locations : [],
       adGroups : {} 
     };
+    
+    
+    var locationIterator = campaign.targeting().targetedLocations().get();
+    while (locationIterator.hasNext()) {
+      var location = locationIterator.next();
+      existingCampaigns[ campaign.getName() ].locations.push( location.getId() );
+    }
     
     var adGroupIterator = campaign.adGroups().get();
     
@@ -280,6 +294,16 @@ function processCampaigns() {
       continue;
     }
     
+    // campaign location targeting
+    for(var loc in existingCampaigns[campaignName].locations ) {
+      var id = existingCampaigns[campaignName].locations[loc];
+      if( newCampaigns[campaignName].locations.indexOf(id) === -1) {
+        existingCampaigns[campaignName].obj.targeting().targetedLocations().withCondition('Id = '+ id).get().next().remove();
+        MyLogger.log('INFO', 'Remove location with id ' + id + ' from campaign ' + campaignName); 
+      }
+    }
+
+    
     for(var adGroupName in existingCampaigns[campaignName].adGroups) {     
     
       // pause non-existent adgroups
@@ -314,7 +338,7 @@ function processCampaigns() {
         var keyword = existingCampaigns[campaignName].adGroups[adGroupName].keywords[n];
 
         if( newCampaigns[campaignName].adGroups[adGroupName].keywords.indexOf( keyword ) === -1 ) {
-          existingCampaigns[campaignName].adGroups[adGroupName].obj.keywords().withCondition("Text = \"" + keyword.replace(/[\[\]\+\"]/g, '') + "\"").get().next().remove(); 
+          existingCampaigns[campaignName].adGroups[adGroupName].obj.keywords().withCondition("Text = \"" + stripKeywordModifiers(keyword) + "\"").get().next().remove(); 
           MyLogger.log('REMOVE_KEYWORD', keyword);
         } 
       }
@@ -375,6 +399,17 @@ function processCampaigns() {
         MyLogger.log('INFO', 'Update campaign ' + campaignName + ' budget from ' + existingCampaigns[campaignName].budget + ' to ' + newCampaigns[campaignName].budget); 
       }  
     }
+    
+    for( var loc in newCampaigns[campaignName].locations ) {
+      var id = newCampaigns[campaignName].locations[loc];
+      
+      if( existingCampaigns[campaignName].locations.indexOf(id) ) {
+        existingCampaigns[campaignName].obj.addLocation(id);
+        MyLogger.log('INFO', 'Added targeting with location id ' + id + ' for campaign ' + campaignName); 
+      }
+      
+    }
+    
   }
   
   // create new adgroups
@@ -660,6 +695,9 @@ function validateExpandedTextAd(ad) {
   return ad;
      
 }
+function stripKeywordModifiers(kw) {
+  return kw.replace(/[\[\]\+\"]/g, '');
+}
 function keywordGenerator(templates, item) {
   var validateKeyword = function(keyword) {
     keyword = keyword.trim().replace(/[^A-Za-zäö ]/g, '').replace(/\s+/g, ' ');
@@ -667,7 +705,6 @@ function keywordGenerator(templates, item) {
     
   }
   var keywordFormat = function(matchType, keyword) {
-
     var matchTypesAllowed = [ 'broad', 'broadMatchModifier', 'exact', 'phrase' ]
     if(!matchType ) {
       matchType = 'broad';
@@ -692,6 +729,7 @@ function keywordGenerator(templates, item) {
     return keyword;
     
   }
+
   var created = [];
   for( var t in templates) {
     
@@ -706,12 +744,16 @@ function keywordGenerator(templates, item) {
     }
     var combineAfter = (typeof template.combineAfter !== 'undefined') ? template.combineAfter : true;
     var combineBefore = (typeof template.combineBefore !== 'undefined') ? template.combineBefore : false;
+    
+    
      
     for(var i in seeds ) {
       if( !template.combineList ) {
         var kw = keywordFormat(template.matchType, seeds[i] );
         if( template.exclude ) {
-          if ( !excludePattern.test(kw) ) {
+          if ( !excludePattern.test(stripKeywordModifiers(kw)) ) {
+            
+         
             created.push( kw );
           }
         }
@@ -732,8 +774,8 @@ function keywordGenerator(templates, item) {
             if( combineAfter ) {
               var kw = keywordFormat(template.matchType, seeds[i] + ' ' + mergeKws[k] );
               if( template.exclude ) {
-                if( !excludePattern.test(kw) ) {
-                  
+                if( !excludePattern.test(stripKeywordModifiers(kw)) ) {
+             
                   created.push( kw );
                 }
               }
@@ -744,7 +786,7 @@ function keywordGenerator(templates, item) {
             if( combineBefore ) {
               var kw = keywordFormat(template.matchType, mergeKws[k] + ' ' +  seeds[i] );
               if( template.exclude ) {
-                if( !excludePattern.test(kw) ) {
+                if( !excludePattern.test(stripKeywordModifiers(kw)) ) {
                   created.push( kw );
                 }
               }
@@ -767,6 +809,7 @@ function keywordGenerator(templates, item) {
   
 }
 function main() {
+  
   readExistingCampaignStructure(function() {
 
     readNewCampaignStructure(function() {
