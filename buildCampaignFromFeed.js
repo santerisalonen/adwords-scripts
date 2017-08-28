@@ -404,7 +404,7 @@ function processCampaigns() {
     for( var loc in newCampaigns[campaignName].locations ) {
       var id = newCampaigns[campaignName].locations[loc];
       
-      if( existingCampaigns[campaignName].locations.indexOf(id) ) {
+      if( existingCampaigns[campaignName].locations.indexOf(id) === -1 ) {
         existingCampaigns[campaignName].obj.addLocation(id);
         MyLogger.log('INFO', 'Added targeting with location id ' + id + ' for campaign ' + campaignName); 
       }
