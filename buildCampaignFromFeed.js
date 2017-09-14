@@ -381,7 +381,8 @@ function processCampaigns() {
         obj : createdCampaign, 
         name : createdCampaign.getName(),
         budget : createdCampaign.getBudget(),
-        adGroups : {} 
+        adGroups : {},
+        locations : []
       };
     }
     else {
