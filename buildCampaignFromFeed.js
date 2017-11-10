@@ -750,6 +750,13 @@ function keywordGenerator(templates, item) {
     
      
     for(var i in seeds ) {
+     
+      if( validateKeyword(seeds[i]).length < 1 ) {
+        // Handle the errors.
+        MyLogger.log('ERR', 'Seed KW ' + seeds[i] + ' results in zero lenght keyword, skipping');
+        continue;
+      }
+     
       if( !template.combineList ) {
         var kw = keywordFormat(template.matchType, seeds[i] );
         if( template.exclude ) {
