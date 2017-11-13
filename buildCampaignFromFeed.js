@@ -322,16 +322,22 @@ function processCampaigns() {
         
                    
         if( JSON.stringify( newCampaigns[campaignName].adGroups[adGroupName].ads ).indexOf( JSON.stringify(ad) ) == -1 ) {
-          existingCampaigns[campaignName].adGroups[adGroupName].obj.ads()
-          .withCondition('HeadlinePart1 = "' + ad.headlinePart1 + '"')
-          .withCondition('HeadlinePart2 = "' + ad.headlinePart2 + '"')
-          .withCondition('Description = "' + ad.description + '"')
-          .withCondition('CreativeFinalUrls = "' + ad.finalUrl + '"')
-          .withCondition('Path1 = "' + ad.path1 + '"')
-          .withCondition('Path2 = "' + ad.path2 + '"')
-          .get().next().remove();
-          
-          MyLogger.log('REMOVE_AD', ad.headlinePart1 + '(adgroup + ' + adGroupName + ')');
+         
+         try {
+           existingCampaigns[campaignName].adGroups[adGroupName].obj.ads()
+           .withCondition('HeadlinePart1 = "' + ad.headlinePart1 + '"')
+           .withCondition('HeadlinePart2 = "' + ad.headlinePart2 + '"')
+           .withCondition('Description = "' + ad.description + '"')
+           .withCondition('CreativeFinalUrls = "' + ad.finalUrl + '"')
+           .withCondition('Path1 = "' + ad.path1 + '"')
+           .withCondition('Path2 = "' + ad.path2 + '"')
+           .get().next().remove();
+
+           MyLogger.log('REMOVE_AD', ad.headlinePart1 + '(adgroup: ' + adGroupName + ')');
+         }
+         catch(e){
+           MyLogger.log('ALR', 'unable to remove ad: ' + ad.headlinePart1 + '(adgroup: ' + adGroupName + '). Reason: ' + e.message);
+         }
         }
       }
       // loop through keywords 
