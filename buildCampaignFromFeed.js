@@ -151,14 +151,17 @@ function readNewCampaignStructure(callback) {
            }
            
            // build bid
+           var bid;
            var bidFormula = (typeof campaign.bidFormula !== 'undefined') ? campaign.bidFormula : config.bidFormula;
-           bidFormula = nano(bidFormula, item);
-           try {
-             var bid = eval(bidFormula);
-           }
-           catch(err) {
-             var bid;
-             MyLogger.log('ERR', 'Bid formula error: ' + err.message + ' formula: ' + bidFormula);
+           if(bidFormula) {
+             bidFormula = nano(bidFormula, item);
+             try {
+               var bid = eval(bidFormula);
+             }
+             catch(err) {
+               var bid;
+               MyLogger.log('ERR', 'Bid formula error: ' + err.message + ' formula: ' + bidFormula);
+             }
            }
            bid = (typeof bid === 'number') ? bid : (typeof campaign.defaultBid === 'number') ? campaign.defaultBid : config.defaultBid;
            
